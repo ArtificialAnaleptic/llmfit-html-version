@@ -4,6 +4,9 @@
 
 The original LLMFIT terminal tool implemented as html.
 
+<img width="2559" height="1288" alt="image" src="https://github.com/user-attachments/assets/169eb7f6-c871-4d35-b8bf-432e7b15ff96" />
+
+
 ### To use
 
 Access it via the github page, or just clone the repo and use it. 
