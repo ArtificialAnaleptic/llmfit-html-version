@@ -1,12 +1,1230 @@
-<html>
+<!DOCTYPE html>
+<html lang="en">
 <head>
-  <meta charset="utf-8">
-  <title>llmfit</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>llmfit — find your perfect local model</title>
+<link href="https://fonts.googleapis.com/css2?family=Azeret+Mono:wght@300;400;500;600;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #080b0e;
+    --bg2: #0d1117;
+    --bg3: #131920;
+    --bg4: #1a2330;
+    --border: #1e2d3d;
+    --border2: #243545;
+    --text: #c8d8e8;
+    --text-dim: #5a7a9a;
+    --text-bright: #e8f4ff;
+    --green: #3dffa0;
+    --green-dim: #1a7a4a;
+    --blue: #38b8ff;
+    --blue-dim: #1a4a7a;
+    --yellow: #f0d060;
+    --yellow-dim: #6a5020;
+    --red: #ff6060;
+    --red-dim: #6a2020;
+    --purple: #b060ff;
+    --mono: 'Azeret Mono', monospace;
+    --sans: 'DM Sans', sans-serif;
+    --radius: 6px;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: var(--mono);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* SCANLINE OVERLAY */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,0,0,0.06) 2px,
+      rgba(0,0,0,0.06) 4px
+    );
+    pointer-events: none;
+    z-index: 1000;
+  }
+
+  /* HEADER */
+  .header {
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+    padding: 0 24px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    height: 52px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .logo {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--green);
+    letter-spacing: -0.5px;
+    white-space: nowrap;
+  }
+  .logo span { color: var(--text-dim); font-weight: 300; }
+  .header-stats {
+    display: flex;
+    gap: 16px;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+  }
+  .stat-chip {
+    font-size: 11px;
+    color: var(--text-dim);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+  }
+  .stat-chip strong { color: var(--blue); }
+  .header-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .upload-btn {
+    background: var(--bg4);
+    border: 1px solid var(--border2);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 6px 14px;
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .upload-btn:hover { border-color: var(--green); color: var(--green); }
+  #file-input { display: none; }
+
+  .fetch-status { font-size: 10px; white-space: nowrap; color: var(--text-dim); }
+
+  /* MAIN LAYOUT */
+  .layout {
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    height: calc(100vh - 52px);
+  }
+
+  /* SIDEBAR */
+  .sidebar {
+    background: var(--bg2);
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+    padding: 20px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+  .sidebar::-webkit-scrollbar { width: 4px; }
+  .sidebar::-webkit-scrollbar-track { background: transparent; }
+  .sidebar::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+  .sidebar-section { display: flex; flex-direction: column; gap: 10px; }
+  .sidebar-title {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .field-group { display: flex; flex-direction: column; gap: 4px; }
+  .field-label {
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 0.05em;
+  }
+  .field-label .unit { color: var(--text-dim); opacity: 0.6; }
+
+  select, input[type="number"] {
+    background: var(--bg3);
+    border: 1px solid var(--border2);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 12px;
+    padding: 7px 10px;
+    border-radius: var(--radius);
+    width: 100%;
+    outline: none;
+    transition: border-color 0.15s;
+    appearance: none;
+    -webkit-appearance: none;
+  }
+  select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' fill='none'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%235a7a9a' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; padding-right: 28px; }
+  select:focus, input[type="number"]:focus { border-color: var(--blue); }
+  select option { background: var(--bg3); }
+
+  .slider-row { display: flex; align-items: center; gap: 8px; }
+  input[type="range"] {
+    flex: 1;
+    -webkit-appearance: none;
+    height: 3px;
+    background: var(--border2);
+    border-radius: 2px;
+    outline: none;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 13px;
+    height: 13px;
+    background: var(--green);
+    border-radius: 50%;
+    cursor: pointer;
+    box-shadow: 0 0 6px rgba(61,255,160,0.4);
+  }
+  .slider-val {
+    font-size: 12px;
+    color: var(--green);
+    min-width: 40px;
+    text-align: right;
+  }
+
+  .hw-summary {
+    background: var(--bg3);
+    border: 1px solid var(--border2);
+    border-radius: var(--radius);
+    padding: 12px;
+    font-size: 11px;
+    color: var(--text-dim);
+    line-height: 1.7;
+  }
+  .hw-summary .hl { color: var(--blue); }
+
+  /* Fit legend */
+  .legend { display: flex; flex-direction: column; gap: 6px; }
+  .legend-item { display: flex; align-items: center; gap: 8px; font-size: 11px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .dot.perfect { background: var(--green); box-shadow: 0 0 6px var(--green); }
+  .dot.good { background: var(--blue); }
+  .dot.marginal { background: var(--yellow); }
+  .dot.cant { background: var(--red); }
+  .dot.embed { background: var(--purple); }
+
+  /* MAIN CONTENT */
+  .main { overflow: hidden; display: flex; flex-direction: column; }
+
+  .toolbar {
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+    padding: 10px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
+  }
+  .search-wrap {
+    position: relative;
+    flex: 1;
+    max-width: 320px;
+  }
+  .search-icon {
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-dim);
+    font-size: 12px;
+  }
+  #search {
+    background: var(--bg3);
+    border: 1px solid var(--border2);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 12px;
+    padding: 7px 10px 7px 30px;
+    border-radius: var(--radius);
+    width: 100%;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  #search:focus { border-color: var(--blue); }
+  #search::placeholder { color: var(--text-dim); }
+
+  .filter-group { display: flex; gap: 6px; align-items: center; }
+  .filter-btn {
+    background: var(--bg3);
+    border: 1px solid var(--border2);
+    color: var(--text-dim);
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.05em;
+    padding: 5px 10px;
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+  .filter-btn:hover { border-color: var(--text-dim); color: var(--text); }
+  .filter-btn.active { background: var(--blue-dim); border-color: var(--blue); color: var(--blue); }
+  .filter-btn.active.green { background: var(--green-dim); border-color: var(--green); color: var(--green); }
+
+  .result-count {
+    margin-left: auto;
+    font-size: 11px;
+    color: var(--text-dim);
+    white-space: nowrap;
+  }
+  .result-count span { color: var(--text); }
+
+  /* TABLE */
+  .table-wrap {
+    overflow: auto;
+    flex: 1;
+  }
+  .table-wrap::-webkit-scrollbar { width: 6px; height: 6px; }
+  .table-wrap::-webkit-scrollbar-track { background: transparent; }
+  .table-wrap::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+    min-width: 900px;
+  }
+  thead tr {
+    background: var(--bg3);
+    border-bottom: 1px solid var(--border2);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+  th {
+    padding: 8px 12px;
+    text-align: left;
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    color: var(--text-dim);
+    white-space: nowrap;
+    cursor: pointer;
+    user-select: none;
+    transition: color 0.15s;
+  }
+  th:hover { color: var(--text); }
+  th.sorted { color: var(--blue); }
+  th .sort-arrow { opacity: 0.4; margin-left: 4px; }
+  th.sorted .sort-arrow { opacity: 1; }
+
+  tbody tr {
+    border-bottom: 1px solid var(--border);
+    transition: background 0.1s;
+    cursor: pointer;
+  }
+  tbody tr:hover { background: var(--bg3); }
+  tbody tr.highlighted { background: rgba(56,184,255,0.06); }
+
+  td {
+    padding: 8px 12px;
+    white-space: nowrap;
+    vertical-align: middle;
+  }
+  td.model-name {
+    max-width: 240px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .model-name-main { color: var(--text-bright); font-size: 12px; }
+  .model-name-sub { color: var(--text-dim); font-size: 10px; margin-top: 1px; }
+
+  .provider-badge {
+    font-size: 10px;
+    color: var(--text-dim);
+    background: var(--bg4);
+    padding: 2px 7px;
+    border-radius: 3px;
+    display: inline-block;
+  }
+
+  .score-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .score-num { font-size: 12px; color: var(--text-bright); min-width: 24px; }
+  .bar-bg {
+    width: 40px;
+    height: 3px;
+    background: var(--border2);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .bar-fill {
+    height: 100%;
+    border-radius: 2px;
+    background: linear-gradient(90deg, var(--blue), var(--green));
+  }
+
+  .toks { color: var(--text-bright); }
+  .toks.na { color: var(--text-dim); }
+
+  .quant {
+    font-size: 10px;
+    padding: 2px 7px;
+    border-radius: 3px;
+    background: var(--bg4);
+    color: var(--blue);
+    letter-spacing: 0.02em;
+  }
+  .quant.high { background: rgba(61,255,160,0.08); color: var(--green); }
+  .quant.mid { background: rgba(56,184,255,0.08); color: var(--blue); }
+  .quant.low { background: rgba(240,208,96,0.08); color: var(--yellow); }
+
+  .mode-badge {
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 3px;
+    letter-spacing: 0.04em;
+  }
+  .mode-badge.gpu { background: rgba(61,255,160,0.1); color: var(--green); }
+  .mode-badge.cpugpu { background: rgba(240,208,96,0.1); color: var(--yellow); }
+  .mode-badge.cpu { background: rgba(90,122,154,0.2); color: var(--text-dim); }
+  .mode-badge.embed { background: rgba(176,96,255,0.1); color: var(--purple); }
+  .mode-badge.cant { background: rgba(255,96,96,0.1); color: var(--red); }
+
+  .mem-cell { display: flex; align-items: center; gap: 6px; }
+  .mem-num { min-width: 32px; font-size: 11px; color: var(--text-dim); }
+  .mem-bar-bg { width: 36px; height: 3px; background: var(--border2); border-radius: 2px; overflow: hidden; }
+  .mem-bar-fill { height: 100%; border-radius: 2px; }
+  .mem-bar-fill.low { background: var(--green); }
+  .mem-bar-fill.mid { background: var(--yellow); }
+  .mem-bar-fill.high { background: var(--red); }
+
+  .ctx-val { font-size: 11px; color: var(--text-dim); }
+  .ctx-val.large { color: var(--blue); }
+
+  .fit-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 10px;
+    letter-spacing: 0.05em;
+    font-weight: 600;
+    padding: 3px 8px;
+    border-radius: 3px;
+  }
+  .fit-badge.perfect { background: rgba(61,255,160,0.12); color: var(--green); border: 1px solid rgba(61,255,160,0.25); }
+  .fit-badge.good { background: rgba(56,184,255,0.1); color: var(--blue); border: 1px solid rgba(56,184,255,0.2); }
+  .fit-badge.marginal { background: rgba(240,208,96,0.1); color: var(--yellow); border: 1px solid rgba(240,208,96,0.2); }
+  .fit-badge.cantrun { background: rgba(255,96,96,0.1); color: var(--red); border: 1px solid rgba(255,96,96,0.2); }
+  .fit-badge.embed { background: rgba(176,96,255,0.1); color: var(--purple); border: 1px solid rgba(176,96,255,0.2); }
+
+  .use-case { font-size: 11px; color: var(--text-dim); max-width: 180px; overflow: hidden; text-overflow: ellipsis; }
+
+  /* EMPTY STATE */
+  .empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    gap: 16px;
+    color: var(--text-dim);
+    font-family: var(--sans);
+  }
+  .empty-icon {
+    font-size: 48px;
+    opacity: 0.3;
+  }
+  .empty h3 { font-size: 16px; color: var(--text); font-weight: 500; }
+  .empty p { font-size: 13px; text-align: center; max-width: 320px; line-height: 1.6; }
+  .empty .upload-big {
+    background: var(--bg3);
+    border: 2px dashed var(--border2);
+    border-radius: 10px;
+    padding: 24px 40px;
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.2s;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text-dim);
+  }
+  .empty .upload-big:hover { border-color: var(--green); color: var(--green); background: var(--bg4); }
+  .empty .upload-big .arrow { font-size: 24px; display: block; margin-bottom: 8px; }
+
+  /* DETAIL PANEL */
+  .detail-panel {
+    position: fixed;
+    right: 0;
+    top: 52px;
+    bottom: 0;
+    width: 320px;
+    background: var(--bg2);
+    border-left: 1px solid var(--border2);
+    padding: 20px;
+    overflow-y: auto;
+    transform: translateX(100%);
+    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 50;
+    font-size: 12px;
+  }
+  .detail-panel.open { transform: translateX(0); }
+  .detail-panel::-webkit-scrollbar { width: 4px; }
+  .detail-panel::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+  .detail-close {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    cursor: pointer;
+    font-size: 16px;
+    padding: 4px;
+    transition: color 0.15s;
+  }
+  .detail-close:hover { color: var(--text); }
+  .detail-model-name { font-size: 13px; color: var(--text-bright); font-weight: 600; line-height: 1.4; padding-right: 24px; margin-bottom: 4px; }
+  .detail-provider { font-size: 11px; color: var(--text-dim); margin-bottom: 16px; }
+  .detail-section-title { font-size: 10px; letter-spacing: 0.1em; color: var(--text-dim); text-transform: uppercase; margin: 16px 0 8px; border-top: 1px solid var(--border); padding-top: 12px; }
+  .detail-row { display: flex; justify-content: space-between; align-items: baseline; padding: 4px 0; border-bottom: 1px solid rgba(30,45,61,0.5); }
+  .detail-key { color: var(--text-dim); font-size: 11px; }
+  .detail-val { color: var(--text-bright); font-size: 11px; text-align: right; }
+  .detail-val.green { color: var(--green); }
+  .detail-val.blue { color: var(--blue); }
+  .detail-val.yellow { color: var(--yellow); }
+  .detail-val.red { color: var(--red); }
+
+  .hf-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--bg4);
+    border: 1px solid var(--border2);
+    color: var(--text-dim);
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 6px 12px;
+    border-radius: var(--radius);
+    text-decoration: none;
+    margin-top: 16px;
+    transition: all 0.15s;
+    width: 100%;
+    justify-content: center;
+  }
+  .hf-link:hover { border-color: var(--blue); color: var(--blue); }
+
+  .glow-green { text-shadow: 0 0 8px rgba(61,255,160,0.5); }
+
+  /* Drag and drop */
+  .drag-over { border-color: var(--green) !important; background: rgba(61,255,160,0.04) !important; }
+
+  /* ANIMATIONS */
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+  tbody tr { animation: fadeIn 0.2s ease forwards; }
+</style>
 </head>
 <body>
-  <h1>llmfit</h1>
-  <p>Match LLM models to your hardware.</p>
-  <pre>curl -fsSL https://llmfit.axjns.dev/install.sh | sh</pre>
-  <p><a href="https://github.com/AlexsJones/llmfit">GitHub</a></p>
+
+<header class="header">
+  <div class="logo">llm<span>fit</span></div>
+  <div class="header-stats" id="headerStats">
+    <div class="stat-chip">load a model json to begin</div>
+  </div>
+  <div class="header-stats" id="headerStats">
+    <div class="stat-chip" id="fetchStatus">⟳ loading default dataset…</div>
+  </div>
+  <div class="header-actions">
+    <button class="upload-btn" onclick="document.getElementById('file-input').click()">↑ upload json</button>
+    <input type="file" id="file-input" accept=".json">
+  </div>
+</header>
+
+<div class="layout">
+  <aside class="sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-title">hardware config</div>
+
+      <div class="field-group">
+        <div class="field-label">GPU Generation</div>
+        <select id="gpu-gen" onchange="recalc()">
+          <optgroup label="NVIDIA RTX 50 series">
+            <option value="rtx5090">RTX 5090</option>
+            <option value="rtx5080">RTX 5080</option>
+            <option value="rtx5070">RTX 5070 / Ti</option>
+            <option value="rtx5060">RTX 5060 / Ti</option>
+          </optgroup>
+          <optgroup label="NVIDIA RTX 40 series">
+            <option value="rtx4090">RTX 4090</option>
+            <option value="rtx4080">RTX 4080 / Super</option>
+            <option value="rtx4070">RTX 4070 / Ti / Super</option>
+            <option value="rtx4060" selected>RTX 4060 / Ti</option>
+            <option value="rtx4060m">RTX 4060 Laptop</option>
+          </optgroup>
+          <optgroup label="NVIDIA RTX 30 series">
+            <option value="rtx3090">RTX 3090 / Ti</option>
+            <option value="rtx3080">RTX 3080 / Ti</option>
+            <option value="rtx3070">RTX 3070 / Ti</option>
+            <option value="rtx3060">RTX 3060 / Ti</option>
+          </optgroup>
+          <optgroup label="NVIDIA RTX 20 / GTX 16">
+            <option value="rtx2080">RTX 2080 / Super / Ti</option>
+            <option value="rtx2070">RTX 2070</option>
+            <option value="rtx2060">RTX 2060</option>
+            <option value="gtx1660">GTX 1660 / Ti / Super</option>
+          </optgroup>
+          <optgroup label="NVIDIA GTX 10 series">
+            <option value="gtx1080">GTX 1080 / Ti</option>
+            <option value="gtx1070">GTX 1070</option>
+            <option value="gtx1060">GTX 1060</option>
+          </optgroup>
+          <optgroup label="AMD RDNA 3 (RX 7xxx)">
+            <option value="rx7900">RX 7900 XTX / XT</option>
+            <option value="rx7800">RX 7800 / 7700 XT</option>
+            <option value="rx7600">RX 7600</option>
+          </optgroup>
+          <optgroup label="AMD RDNA 2 (RX 6xxx)">
+            <option value="rx6900">RX 6900 / 6800 XT</option>
+            <option value="rx6700">RX 6700 XT</option>
+            <option value="rx6600">RX 6600 XT</option>
+          </optgroup>
+          <optgroup label="Apple Silicon">
+            <option value="m4max">Apple M4 Max / Ultra</option>
+            <option value="m4pro">Apple M4 Pro</option>
+            <option value="m4">Apple M4</option>
+            <option value="m3max">Apple M3 Max / Ultra</option>
+            <option value="m3pro">Apple M3 Pro</option>
+            <option value="m3">Apple M3</option>
+            <option value="m2max">Apple M2 Max / Ultra</option>
+            <option value="m2pro">Apple M2 Pro</option>
+            <option value="m2">Apple M2</option>
+            <option value="m1max">Apple M1 Max / Ultra</option>
+            <option value="m1pro">Apple M1 Pro</option>
+            <option value="m1">Apple M1</option>
+          </optgroup>
+          <optgroup label="No GPU / CPU only">
+            <option value="cpu">CPU only (no GPU)</option>
+          </optgroup>
+        </select>
+      </div>
+
+      <div class="field-group" id="vram-group">
+        <div class="field-label">VRAM <span class="unit">GB</span></div>
+        <div class="slider-row">
+          <input type="range" id="vram-slider" min="2" max="80" value="8" step="1" oninput="syncSlider('vram')">
+          <span class="slider-val" id="vram-val">8 GB</span>
+        </div>
+      </div>
+
+      <div class="field-group">
+        <div class="field-label">System RAM <span class="unit">GB</span></div>
+        <div class="slider-row">
+          <input type="range" id="ram-slider" min="4" max="256" value="16" step="2" oninput="syncSlider('ram')">
+          <span class="slider-val" id="ram-val">16 GB</span>
+        </div>
+      </div>
+
+      <div class="field-group">
+        <div class="field-label">CPU Cores</div>
+        <select id="cpu-cores" onchange="recalc()">
+          <option value="4">4 cores</option>
+          <option value="6">6 cores</option>
+          <option value="8">8 cores</option>
+          <option value="10">10 cores</option>
+          <option value="12">12 cores</option>
+          <option value="16" selected>16 cores</option>
+          <option value="22">22 cores (Intel Ultra)</option>
+          <option value="24">24 cores</option>
+          <option value="32">32+ cores</option>
+        </select>
+      </div>
+
+      <div class="field-group">
+        <div class="field-label">CPU Speed</div>
+        <select id="cpu-speed" onchange="recalc()">
+          <option value="2.5">≤ 2.5 GHz (laptop/eco)</option>
+          <option value="3.0">3.0 GHz</option>
+          <option value="3.5">3.5 GHz</option>
+          <option value="4.0" selected>4.0 GHz</option>
+          <option value="4.5">4.5 GHz</option>
+          <option value="5.0">5.0 GHz+</option>
+        </select>
+      </div>
+
+      <div class="hw-summary" id="hwSummary">
+        Configure your hardware above, then load a model JSON.
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-title">fit legend</div>
+      <div class="legend">
+        <div class="legend-item"><div class="dot perfect"></div> <span style="color:var(--text)">Perfect</span> <span style="color:var(--text-dim);font-size:10px;margin-left:auto">runs great on GPU</span></div>
+        <div class="legend-item"><div class="dot good"></div> <span style="color:var(--text)">Good</span> <span style="color:var(--text-dim);font-size:10px;margin-left:auto">fits, some limits</span></div>
+        <div class="legend-item"><div class="dot marginal"></div> <span style="color:var(--text)">Marginal</span> <span style="color:var(--text-dim);font-size:10px;margin-left:auto">CPU offload needed</span></div>
+        <div class="legend-item"><div class="dot cant"></div> <span style="color:var(--text)">Can't run</span> <span style="color:var(--text-dim);font-size:10px;margin-left:auto">exceeds RAM</span></div>
+        <div class="legend-item"><div class="dot embed"></div> <span style="color:var(--text)">Embed</span> <span style="color:var(--text-dim);font-size:10px;margin-left:auto">non-generative</span></div>
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-title">filter by fit</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;">
+        <button class="filter-btn active green" id="f-perfect" onclick="toggleFilter('perfect')">Perfect</button>
+        <button class="filter-btn active" id="f-good" onclick="toggleFilter('good')">Good</button>
+        <button class="filter-btn" id="f-marginal" onclick="toggleFilter('marginal')">Marginal</button>
+        <button class="filter-btn" id="f-cantrun" onclick="toggleFilter('cantrun')">Can't run</button>
+        <button class="filter-btn" id="f-embed" onclick="toggleFilter('embed')">Embed</button>
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-title">filter by use case</div>
+      <select id="usecase-filter" onchange="renderTable()">
+        <option value="all">All use cases</option>
+        <option value="coding">Coding</option>
+        <option value="chat">Chat / General</option>
+        <option value="multimodal">Multimodal</option>
+        <option value="reasoning">Reasoning</option>
+        <option value="embed">Embeddings / RAG</option>
+      </select>
+    </div>
+  </aside>
+
+  <main class="main" id="mainContent">
+    <div class="empty" id="emptyState">
+      <div class="empty-icon">⬡</div>
+      <h3>No models loaded</h3>
+      <p>Upload your Hugging Face models JSON to find which ones run best on your hardware.</p>
+      <label class="upload-big" for="file-input">
+        <span class="arrow">↑</span>
+        Drop or click to load JSON
+      </label>
+    </div>
+
+    <div id="tableContainer" style="display:none;flex-direction:column;height:100%;">
+      <div class="toolbar">
+        <div class="search-wrap">
+          <span class="search-icon">⌕</span>
+          <input type="text" id="search" placeholder="search models, providers, use cases..." oninput="renderTable()">
+        </div>
+        <div class="filter-group">
+          <button class="filter-btn" id="sort-fit" onclick="setSortQuick('fit')" title="Sort by fit quality">⬆ Fit</button>
+          <button class="filter-btn" id="sort-score" onclick="setSortQuick('score')" title="Sort by score">⬆ Score</button>
+          <button class="filter-btn" id="sort-speed" onclick="setSortQuick('toks')" title="Sort by speed">⬆ Speed</button>
+        </div>
+        <div class="result-count"><span id="countDisplay">—</span> models</div>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th onclick="setSort('name')"><span class="sort-arrow" id="arr-name"></span>MODEL</th>
+              <th onclick="setSort('provider')"><span class="sort-arrow" id="arr-provider"></span>PROVIDER</th>
+              <th onclick="setSort('params')"><span class="sort-arrow" id="arr-params"></span>PARAMS</th>
+              <th onclick="setSort('score')"><span class="sort-arrow" id="arr-score"></span>SCORE</th>
+              <th onclick="setSort('toks')"><span class="sort-arrow" id="arr-toks"></span>TOK/S</th>
+              <th onclick="setSort('quant')"><span class="sort-arrow" id="arr-quant"></span>QUANT</th>
+              <th onclick="setSort('mode')"><span class="sort-arrow" id="arr-mode"></span>MODE</th>
+              <th onclick="setSort('mem')"><span class="sort-arrow" id="arr-mem"></span>MEM%</th>
+              <th onclick="setSort('ctx')"><span class="sort-arrow" id="arr-ctx"></span>CTX</th>
+              <th onclick="setSort('fit')"><span class="sort-arrow" id="arr-fit"></span>FIT</th>
+              <th>USE CASE</th>
+            </tr>
+          </thead>
+          <tbody id="tableBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- DETAIL PANEL -->
+<div class="detail-panel" id="detailPanel">
+  <button class="detail-close" onclick="closeDetail()">✕</button>
+  <div id="detailContent"></div>
+</div>
+
+<script>
+// ─── GPU PROFILES ──────────────────────────────────────────────────────
+const GPU_PROFILES = {
+  // RTX 50
+  rtx5090:  { tflops: 3360, bw: 1792, factor: 1.30, name: 'RTX 5090' },
+  rtx5080:  { tflops: 2160, bw: 960,  factor: 1.05, name: 'RTX 5080' },
+  rtx5070:  { tflops: 1130, bw: 672,  factor: 0.80, name: 'RTX 5070 Ti' },
+  rtx5060:  { tflops: 630,  bw: 480,  factor: 0.58, name: 'RTX 5060 Ti' },
+  // RTX 40
+  rtx4090:  { tflops: 1321, bw: 1008, factor: 1.00, name: 'RTX 4090' },
+  rtx4080:  { tflops: 972,  bw: 736,  factor: 0.78, name: 'RTX 4080 Super' },
+  rtx4070:  { tflops: 641,  bw: 504,  factor: 0.60, name: 'RTX 4070 Ti' },
+  rtx4060:  { tflops: 336,  bw: 288,  factor: 0.42, name: 'RTX 4060 Ti' },
+  rtx4060m: { tflops: 216,  bw: 192,  factor: 0.30, name: 'RTX 4060 Laptop' },
+  // RTX 30
+  rtx3090:  { tflops: 710,  bw: 936,  factor: 0.72, name: 'RTX 3090 Ti' },
+  rtx3080:  { tflops: 581,  bw: 760,  factor: 0.60, name: 'RTX 3080 Ti' },
+  rtx3070:  { tflops: 400,  bw: 448,  factor: 0.42, name: 'RTX 3070 Ti' },
+  rtx3060:  { tflops: 252,  bw: 360,  factor: 0.30, name: 'RTX 3060 Ti' },
+  // RTX 20 / GTX 16
+  rtx2080:  { tflops: 390,  bw: 448,  factor: 0.38, name: 'RTX 2080 Ti' },
+  rtx2070:  { tflops: 276,  bw: 448,  factor: 0.28, name: 'RTX 2070 Super' },
+  rtx2060:  { tflops: 220,  bw: 336,  factor: 0.22, name: 'RTX 2060 Super' },
+  gtx1660:  { tflops: 142,  bw: 288,  factor: 0.15, name: 'GTX 1660 Super' },
+  // GTX 10
+  gtx1080:  { tflops: 177,  bw: 320,  factor: 0.17, name: 'GTX 1080 Ti' },
+  gtx1070:  { tflops: 128,  bw: 256,  factor: 0.13, name: 'GTX 1070' },
+  gtx1060:  { tflops: 73,   bw: 192,  factor: 0.09, name: 'GTX 1060' },
+  // AMD RDNA 3
+  rx7900:   { tflops: 983,  bw: 960,  factor: 0.75, name: 'RX 7900 XTX' },
+  rx7800:   { tflops: 573,  bw: 624,  factor: 0.55, name: 'RX 7800 XT' },
+  rx7600:   { tflops: 329,  bw: 288,  factor: 0.32, name: 'RX 7600' },
+  // AMD RDNA 2
+  rx6900:   { tflops: 641,  bw: 512,  factor: 0.52, name: 'RX 6900 XTX' },
+  rx6700:   { tflops: 330,  bw: 384,  factor: 0.34, name: 'RX 6700 XT' },
+  rx6600:   { tflops: 197,  bw: 224,  factor: 0.20, name: 'RX 6600 XT' },
+  // Apple Silicon (unified memory — VRAM = RAM)
+  m4max:    { tflops: 274,  bw: 546,  factor: 0.88, name: 'Apple M4 Max' },
+  m4pro:    { tflops: 137,  bw: 273,  factor: 0.68, name: 'Apple M4 Pro' },
+  m4:       { tflops: 55,   bw: 120,  factor: 0.45, name: 'Apple M4' },
+  m3max:    { tflops: 219,  bw: 400,  factor: 0.78, name: 'Apple M3 Max' },
+  m3pro:    { tflops: 110,  bw: 200,  factor: 0.58, name: 'Apple M3 Pro' },
+  m3:       { tflops: 44,   bw: 100,  factor: 0.36, name: 'Apple M3' },
+  m2max:    { tflops: 177,  bw: 400,  factor: 0.70, name: 'Apple M2 Max' },
+  m2pro:    { tflops: 88,   bw: 200,  factor: 0.50, name: 'Apple M2 Pro' },
+  m2:       { tflops: 36,   bw: 100,  factor: 0.30, name: 'Apple M2' },
+  m1max:    { tflops: 131,  bw: 400,  factor: 0.62, name: 'Apple M1 Max' },
+  m1pro:    { tflops: 65,   bw: 200,  factor: 0.42, name: 'Apple M1 Pro' },
+  m1:       { tflops: 26,   bw: 68,   factor: 0.22, name: 'Apple M1' },
+  // CPU
+  cpu:      { tflops: 0,    bw: 0,    factor: 0,    name: 'CPU only' },
+};
+
+const APPLE_CHIPS = new Set(['m4max','m4pro','m4','m3max','m3pro','m3','m2max','m2pro','m2','m1max','m1pro','m1']);
+const QUANT_FACTOR = { 'F32':0.4, 'F16':0.55, 'BF16':0.55, 'Q8_0':0.8, 'Q6_K':0.88, 'Q5_K_M':0.93, 'Q4_K_M':1.0, 'Q4_0':1.05, 'Q3_K_M':1.1, 'Q2_K':1.15 };
+const FIT_ORDER = { 'perfect': 0, 'good': 1, 'marginal': 2, 'cantrun': 3, 'embed': 4 };
+
+// ─── STATE ──────────────────────────────────────────────────────────────
+let models = [];
+let computed = [];
+let sortKey = 'fit';
+let sortDir = 1;
+let activeFilters = new Set(['perfect','good']);
+let selectedIdx = null;
+
+// ─── DEFAULT URL ─────────────────────────────────────────────────────────
+const DEFAULT_JSON_URL = 'https://raw.githubusercontent.com/AlexsJones/llmfit/03ab0b6e5a7829fb79d4dc34db7e253632cc80f8/data/hf_models.json.backup.20260219_071732';
+
+// ─── URL FETCH ───────────────────────────────────────────────────────────
+async function fetchFromUrl(url) {
+  const status = document.getElementById('fetchStatus');
+  status.textContent = 'github repo dataset should load - upload your own if it fails';
+  status.style.color = 'var(--text-dim)';
+
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    if (!Array.isArray(data)) throw new Error('Expected a JSON array');
+    models = data;
+    document.getElementById('emptyState').style.display = 'none';
+    document.getElementById('tableContainer').style.display = 'flex';
+    recalc();
+    // headerStats gets replaced by recalc(); status will be in there
+  } catch(err) {
+    status.textContent = `✕ couldn't load default — upload your own JSON`;
+    status.style.color = 'var(--yellow)';
+    document.getElementById('emptyState').style.display = 'flex';
+  }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  fetchFromUrl(DEFAULT_JSON_URL);
+});
+
+// ─── FILE UPLOAD ────────────────────────────────────────────────────────
+document.getElementById('file-input').addEventListener('change', e => {
+  const f = e.target.files[0];
+  if (!f) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      models = JSON.parse(ev.target.result);
+      document.getElementById('emptyState').style.display = 'none';
+      document.getElementById('tableContainer').style.display = 'flex';
+      document.getElementById('fetchStatus').textContent = '';
+      recalc();
+    } catch(err) {
+      alert('Invalid JSON: ' + err.message);
+    }
+  };
+  reader.readAsText(f);
+});
+
+// Drag & drop onto upload-big
+document.addEventListener('dragover', e => e.preventDefault());
+document.addEventListener('drop', e => {
+  e.preventDefault();
+  const f = e.dataTransfer.files[0];
+  if (!f) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      models = JSON.parse(ev.target.result);
+      document.getElementById('emptyState').style.display = 'none';
+      document.getElementById('tableContainer').style.display = 'flex';
+      recalc();
+    } catch(err) { alert('Invalid JSON'); }
+  };
+  reader.readAsText(f);
+});
+
+// ─── SLIDER SYNC ────────────────────────────────────────────────────────
+function syncSlider(which) {
+  const sl = document.getElementById(which + '-slider');
+  const label = document.getElementById(which + '-val');
+  label.textContent = sl.value + ' GB';
+  recalc();
+}
+
+// Apple Silicon: VRAM = RAM
+document.getElementById('gpu-gen').addEventListener('change', function() {
+  const isApple = APPLE_CHIPS.has(this.value);
+  const vramGroup = document.getElementById('vram-group');
+  if (isApple) {
+    vramGroup.style.opacity = '0.4';
+    vramGroup.title = 'Apple Silicon uses unified memory — set RAM above';
+  } else {
+    vramGroup.style.opacity = '1';
+    vramGroup.title = '';
+  }
+  recalc();
+});
+
+// ─── SCORING ────────────────────────────────────────────────────────────
+function computeScore(m) {
+  // Quality: log-normalized param count + context bonus
+  const logP = Math.log(m.parameters_raw);
+  const logMin = Math.log(137e6), logMax = Math.log(72e9);
+  const baseScore = 50 + Math.min(1, Math.max(0, (logP - logMin) / (logMax - logMin))) * 42;
+  const ctxBonus = m.context_length >= 100000 ? 2 : m.context_length >= 32000 ? 1 : 0;
+  return Math.round(Math.min(95, baseScore + ctxBonus));
+}
+
+function computeModel(m, gpuKey, vramGB, ramGB, cpuCores, cpuSpeed) {
+  const profile = GPU_PROFILES[gpuKey] || GPU_PROFILES.cpu;
+  const isApple = APPLE_CHIPS.has(gpuKey);
+  const effectiveVram = isApple ? ramGB : vramGB; // Apple unified
+  const isCpuOnly = gpuKey === 'cpu';
+
+  // Embedding models
+  const isEmbed = m.pipeline_tag === 'feature-extraction' || m.use_case?.toLowerCase().includes('embed') || m.use_case?.toLowerCase().includes('rag');
+
+  // Memory requirements
+  const minVram = m.min_vram_gb;
+  const recRam = m.recommended_ram_gb;
+  const minRam = m.min_ram_gb;
+
+  // ─── FIT ───
+  let fit, mode, memPct;
+  if (isEmbed) {
+    fit = 'embed';
+    mode = 'embed';
+    memPct = Math.round(minVram / Math.max(effectiveVram, 0.1) * 100);
+  } else if (isCpuOnly) {
+    if (ramGB < minRam) {
+      fit = 'cantrun'; mode = 'cant';
+    } else if (ramGB < recRam) {
+      fit = 'marginal'; mode = 'cpu';
+    } else {
+      fit = 'good'; mode = 'cpu';
+    }
+    memPct = Math.round(recRam / ramGB * 100);
+  } else if (effectiveVram >= minVram * 1.35) {
+    fit = 'perfect'; mode = 'GPU'; memPct = Math.round(minVram / effectiveVram * 100);
+  } else if (effectiveVram >= minVram * 0.95) {
+    fit = 'good'; mode = 'GPU'; memPct = Math.round(minVram / effectiveVram * 100);
+  } else if (effectiveVram >= minVram * 0.5 && ramGB >= minRam) {
+    fit = 'marginal'; mode = 'CPU+GPU'; memPct = Math.round(effectiveVram / minVram * 100);
+  } else if (ramGB >= minRam) {
+    fit = 'marginal'; mode = 'CPU'; memPct = Math.round(recRam / ramGB * 100);
+  } else {
+    fit = 'cantrun'; mode = 'cant'; memPct = null;
+  }
+
+  // ─── TOK/S estimate ───
+  // Reference: RTX 4090 with 7B Q4_K_M model → ~80 tok/s
+  const ref_params = 7e9;
+  const ref_toks = 80;
+  let toks = null;
+  if (fit !== 'cantrun' && !isEmbed) {
+    if (isCpuOnly) {
+      // CPU: scale by cores and speed, much slower
+      const cpuBandwidth = cpuCores * cpuSpeed * 0.8; // rough GB/s proxy
+      toks = Math.max(1, Math.round(
+        (cpuBandwidth / 80) * (ref_params / m.parameters_raw) ** 0.65 * 10
+      ));
+    } else if (mode === 'CPU+GPU' || mode === 'CPU') {
+      // Bottlenecked by CPU RAM bandwidth
+      toks = Math.max(1, Math.round(
+        profile.factor * (ref_params / m.parameters_raw) ** 0.65 * ref_toks * 0.25
+      ));
+    } else {
+      const qf = QUANT_FACTOR[m.quantization] || 1.0;
+      toks = Math.max(1, Math.round(
+        profile.factor * (ref_params / m.parameters_raw) ** 0.65 * ref_toks * qf
+      ));
+    }
+  }
+
+  const score = computeScore(m);
+  const ctx = m.context_length;
+
+  // Quant class
+  let quantClass = 'mid';
+  const q = m.quantization;
+  if (['Q8_0','F16','BF16','F32'].includes(q)) quantClass = 'high';
+  else if (['Q2_K','Q3_K_M','Q4_0'].includes(q)) quantClass = 'low';
+
+  return { ...m, score, toks, fit, mode, memPct, quantClass, isEmbed };
+}
+
+// ─── RECALC ─────────────────────────────────────────────────────────────
+function recalc() {
+  if (!models.length) return;
+  const gpuKey = document.getElementById('gpu-gen').value;
+  const vramGB = parseFloat(document.getElementById('vram-slider').value);
+  const ramGB  = parseFloat(document.getElementById('ram-slider').value);
+  const cpuCores = parseInt(document.getElementById('cpu-cores').value);
+  const cpuSpeed = parseFloat(document.getElementById('cpu-speed').value);
+  const profile = GPU_PROFILES[gpuKey];
+  const isApple = APPLE_CHIPS.has(gpuKey);
+
+  computed = models.map(m => computeModel(m, gpuKey, vramGB, ramGB, cpuCores, cpuSpeed));
+
+  // Update summary
+  const effectiveVram = isApple ? ramGB : vramGB;
+  const counts = { perfect: 0, good: 0, marginal: 0, cantrun: 0, embed: 0 };
+  computed.forEach(m => { if (m.fit in counts) counts[m.fit]++; });
+
+  const summaryLines = [
+    `<span class="hl">${profile.name}</span>`,
+    isApple
+      ? `${ramGB} GB unified memory`
+      : `${effectiveVram} GB VRAM / ${ramGB} GB RAM`,
+    `<span style="color:var(--green)">${counts.perfect}</span> perfect &nbsp; <span style="color:var(--blue)">${counts.good}</span> good &nbsp; <span style="color:var(--yellow)">${counts.marginal}</span> marginal`,
+    `<span style="color:var(--red)">${counts.cantrun}</span> can't run &nbsp; <span style="color:var(--purple)">${counts.embed}</span> embed`
+  ];
+  document.getElementById('hwSummary').innerHTML = summaryLines.join('<br>');
+
+  document.getElementById('headerStats').innerHTML = `
+    <div class="stat-chip">${models.length} models</div>
+    <div class="stat-chip">GPU: <strong>${profile.name}</strong></div>
+    <div class="stat-chip">VRAM: <strong>${effectiveVram} GB</strong></div>
+    <div class="stat-chip">RAM: <strong>${ramGB} GB</strong></div>
+    <div class="stat-chip" style="color:var(--green)"><strong>${counts.perfect}</strong> perfect fit</div>
+  `;
+
+  renderTable();
+}
+
+// ─── FILTERS ────────────────────────────────────────────────────────────
+function toggleFilter(fit) {
+  if (activeFilters.has(fit)) {
+    activeFilters.delete(fit);
+    document.getElementById('f-' + fit).classList.remove('active');
+  } else {
+    activeFilters.add(fit);
+    const btn = document.getElementById('f-' + fit);
+    btn.classList.add('active');
+    if (fit === 'perfect') btn.classList.add('green');
+  }
+  renderTable();
+}
+
+function setSortQuick(key) {
+  setSort(key);
+}
+
+function setSort(key) {
+  if (sortKey === key) sortDir *= -1;
+  else { sortKey = key; sortDir = 1; }
+  document.querySelectorAll('th .sort-arrow').forEach(el => el.textContent = '');
+  const arr = document.getElementById('arr-' + key);
+  if (arr) arr.textContent = sortDir === 1 ? '↑' : '↓';
+  document.querySelectorAll('th').forEach(el => el.classList.remove('sorted'));
+  // mark sorted header
+  renderTable();
+}
+
+// ─── RENDER ─────────────────────────────────────────────────────────────
+const FIT_LABEL = { perfect: 'Perfect', good: 'Good', marginal: 'Marginal', cantrun: "Can't run", embed: 'Embed' };
+
+function fmtCtx(n) {
+  if (n >= 100000) return (n / 1000).toFixed(0) + 'k';
+  if (n >= 1000) return (n / 1000).toFixed(0) + 'k';
+  return n;
+}
+function fmtParams(raw) {
+  if (raw >= 1e12) return (raw/1e12).toFixed(1) + 'T';
+  if (raw >= 1e9) return (raw/1e9).toFixed(1) + 'B';
+  if (raw >= 1e6) return (raw/1e6).toFixed(0) + 'M';
+  return raw;
+}
+
+function getSortVal(m, key) {
+  switch(key) {
+    case 'name': return m.name;
+    case 'provider': return m.provider;
+    case 'params': return m.parameters_raw;
+    case 'score': return m.score;
+    case 'toks': return m.toks || 0;
+    case 'quant': return m.quantization;
+    case 'mode': return m.mode;
+    case 'mem': return m.memPct || 999;
+    case 'ctx': return m.context_length;
+    case 'fit': return FIT_ORDER[m.fit] * 1000 - (m.score || 0);
+    default: return 0;
+  }
+}
+
+function renderTable() {
+  const query = document.getElementById('search').value.toLowerCase();
+  const ucFilter = document.getElementById('usecase-filter').value;
+
+  let rows = computed.filter(m => {
+    if (!activeFilters.has(m.fit)) return false;
+    if (query) {
+      const haystack = (m.name + m.provider + m.use_case + m.architecture).toLowerCase();
+      if (!haystack.includes(query)) return false;
+    }
+    if (ucFilter !== 'all') {
+      const uc = (m.use_case || '').toLowerCase();
+      if (ucFilter === 'coding' && !uc.includes('code') && !uc.includes('coder') && !uc.includes('coding')) return false;
+      if (ucFilter === 'chat' && !uc.includes('chat') && !uc.includes('general') && !uc.includes('instruction')) return false;
+      if (ucFilter === 'multimodal' && !uc.includes('multimodal') && !uc.includes('vision') && !uc.includes('image')) return false;
+      if (ucFilter === 'reasoning' && !uc.includes('reason') && !uc.includes('math') && !uc.includes('think')) return false;
+      if (ucFilter === 'embed' && !uc.includes('embed') && !uc.includes('rag')) return false;
+    }
+    return true;
+  });
+
+  rows.sort((a, b) => {
+    const va = getSortVal(a, sortKey), vb = getSortVal(b, sortKey);
+    if (typeof va === 'string') return va.localeCompare(vb) * sortDir;
+    return (va - vb) * sortDir;
+  });
+
+  document.getElementById('countDisplay').textContent = rows.length;
+
+  const tbody = document.getElementById('tableBody');
+  tbody.innerHTML = '';
+
+  rows.forEach((m, i) => {
+    const tr = document.createElement('tr');
+    if (selectedIdx !== null && computed[selectedIdx] === m) tr.classList.add('highlighted');
+
+    const nameParts = m.name.split('/');
+    const nameMain = nameParts[nameParts.length - 1];
+    const nameSub = nameParts.length > 1 ? nameParts[0] : '';
+
+    const memColor = !m.memPct ? '' : m.memPct < 50 ? 'low' : m.memPct < 80 ? 'mid' : 'high';
+    const memBar = m.memPct != null
+      ? `<div class="mem-cell"><span class="mem-num">${m.memPct}%</span><div class="mem-bar-bg"><div class="mem-bar-fill ${memColor}" style="width:${Math.min(100,m.memPct)}%"></div></div></div>`
+      : `<span style="color:var(--text-dim)">—</span>`;
+
+    const scoreBar = `<div class="score-bar"><span class="score-num">${m.score}</span><div class="bar-bg"><div class="bar-fill" style="width:${(m.score - 50) / 45 * 100}%"></div></div></div>`;
+
+    const toksCell = m.toks != null
+      ? `<span class="toks">${m.toks}<span style="color:var(--text-dim);font-size:10px">/s</span></span>`
+      : `<span class="toks na">—</span>`;
+
+    const ctxLarge = m.context_length >= 32000;
+    const ctxCell = `<span class="ctx-val ${ctxLarge?'large':''}">${fmtCtx(m.context_length)}</span>`;
+
+    const modeBadgeMap = {
+      'GPU': 'gpu', 'CPU+GPU': 'cpugpu', 'CPU': 'cpu', 'embed': 'embed', 'cant': 'cant'
+    };
+    const modeLabel = m.mode === 'cant' ? '✕' : m.mode;
+    const modeClass = modeBadgeMap[m.mode] || 'cpu';
+
+    tr.innerHTML = `
+      <td class="model-name">
+        <div class="model-name-main">${nameMain}</div>
+        ${nameSub ? `<div class="model-name-sub">${nameSub}</div>` : ''}
+      </td>
+      <td><span class="provider-badge">${m.provider}</span></td>
+      <td>${fmtParams(m.parameters_raw)}</td>
+      <td>${scoreBar}</td>
+      <td>${toksCell}</td>
+      <td><span class="quant ${m.quantClass}">${m.quantization}</span></td>
+      <td><span class="mode-badge ${modeClass}">${modeLabel}</span></td>
+      <td>${memBar}</td>
+      <td>${ctxCell}</td>
+      <td><span class="fit-badge ${m.fit}">${FIT_LABEL[m.fit]}</span></td>
+      <td><span class="use-case">${m.use_case || '—'}</span></td>
+    `;
+    tr.onclick = () => openDetail(m);
+    tbody.appendChild(tr);
+  });
+}
+
+// ─── DETAIL PANEL ────────────────────────────────────────────────────────
+function openDetail(m) {
+  selectedIdx = computed.indexOf(m);
+  const fitColors = { perfect: 'green', good: 'blue', marginal: 'yellow', cantrun: 'red', embed: '' };
+  const fitColor = fitColors[m.fit] || '';
+
+  const dlRow = (k, v, cls='') => `<div class="detail-row"><span class="detail-key">${k}</span><span class="detail-val ${cls}">${v}</span></div>`;
+
+  let html = `
+    <div class="detail-model-name">${m.name}</div>
+    <div class="detail-provider">${m.provider} · ${m.architecture}</div>
+    <span class="fit-badge ${m.fit}" style="font-size:12px;padding:5px 12px;">${FIT_LABEL[m.fit]}</span>
+
+    <div class="detail-section-title">hardware fit</div>
+    ${dlRow('Mode', m.mode, m.mode === 'GPU' ? 'green' : m.mode === 'CPU+GPU' ? 'yellow' : '')}
+    ${dlRow('Memory use', m.memPct != null ? m.memPct + '%' : '—', m.memPct < 50 ? 'green' : m.memPct < 80 ? '' : 'red')}
+    ${dlRow('Est. speed', m.toks ? m.toks + ' tok/s' : '—', m.toks > 30 ? 'green' : '')}
+
+    <div class="detail-section-title">model specs</div>
+    ${dlRow('Parameters', m.parameter_count)}
+    ${dlRow('Quantization', m.quantization)}
+    ${dlRow('Context', fmtCtx(m.context_length) + ' tokens', m.context_length >= 32000 ? 'blue' : '')}
+    ${dlRow('Quality score', m.score + ' / 95')}
+    ${dlRow('Use case', m.use_case || '—')}
+    ${dlRow('Pipeline', m.pipeline_tag || '—')}
+
+    <div class="detail-section-title">requirements</div>
+    ${dlRow('Min VRAM', m.min_vram_gb + ' GB')}
+    ${dlRow('Min RAM', m.min_ram_gb + ' GB')}
+    ${dlRow('Rec. RAM', m.recommended_ram_gb + ' GB')}
+
+    <div class="detail-section-title">community</div>
+    ${dlRow('Downloads', m.hf_downloads ? m.hf_downloads.toLocaleString() : '—')}
+    ${dlRow('Likes', m.hf_likes ? m.hf_likes.toLocaleString() : '—')}
+
+    <a class="hf-link" href="https://huggingface.co/${m.name}" target="_blank">↗ View on Hugging Face</a>
+  `;
+  document.getElementById('detailContent').innerHTML = html;
+  document.getElementById('detailPanel').classList.add('open');
+}
+
+function closeDetail() {
+  selectedIdx = null;
+  document.getElementById('detailPanel').classList.remove('open');
+}
+
+// ─── INIT ────────────────────────────────────────────────────────────────
+syncSlider('vram');
+syncSlider('ram');
+</script>
 </body>
 </html>
