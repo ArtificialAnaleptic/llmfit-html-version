@@ -6,7 +6,11 @@ The original LLMFIT terminal tool implemented as html.
 
 ### To use
 
-Access it via the github page, or just clone the repo and use it. By default it pull the data from the repo. Or you can use the following script from the original repo to scrape a new/updated JSON and supply it yourself:
+Access it via the github page, or just clone the repo and use it. 
+
+https://artificialanaleptic.github.io/llmfit-html-version/
+
+By default it pull the data from the repo. Or you can use the following script from the original repo to scrape a new/updated JSON and supply it yourself:
 
 ## Model database
 
